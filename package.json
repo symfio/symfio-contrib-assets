@@ -1,0 +1,44 @@
+{
+  "name": "symfio-contrib-assets"
+, "version": "0.1.0"
+, "description": "Compile and serve assets from public directory."
+, "keywords": ["symfio-plugin", "symfio-contrib", "assets"]
+, "homepage": "http://symf.io/plugins/contrib-assets"
+, "bugs": {
+    "url": "https://github.com/symfio/symfio-contrib-assets/issues"
+  , "email": "webmaster@rithis.com"
+  }
+, "author": {
+    "name": "Vyacheslav Slinko"
+  , "email": "vyacheslav.slinko@gmail.com"
+  }
+, "main": "lib/assets"
+, "repository": {
+    "type": "git"
+  , "url": "git://github.com/symfio/symfio-contrib-assets.git"
+  }
+, "scripts": {
+    "test": "grunt simplemocha"
+  }
+, "dependencies": {
+    "connect-coffee-script": "~0.1"
+  , "stylus-responsive": "~0.0"
+  , "jade-static": "git://github.com/vslinko/jade-static.git#patch-1"
+  , "stylus": "~0.32"
+  , "nib": "~0.9"
+  }
+, "devDependencies": {
+    "symfio": "~1.0"
+  , "symfio-suite": "~1.0"
+  , "symfio-contrib-express": "~0.1"
+  , "async": "~0.2"
+  , "grunt": "~0.4"
+  , "grunt-simple-mocha": "~0.3"
+  , "grunt-coffeelint": "~0.0"
+  }
+, "engines": {
+    "node": "~0.8"
+  , "npm": "~1.2"
+  , "coffee-script": "~1.6"
+  }
+}
