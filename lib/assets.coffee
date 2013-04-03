@@ -15,9 +15,6 @@ compilerFactory = (str, path) ->
   compiler.use nib()
   compiler.use responsive
 
-  compiler.import "nib"
-  compiler.import "responsive"
-
 
 module.exports = (container, callback) ->
   applicationDirectory = container.get "application directory"
