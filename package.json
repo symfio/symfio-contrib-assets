@@ -1,6 +1,6 @@
 {
   "name": "symfio-contrib-assets"
-, "version": "0.2.1"
+, "version": "0.2.2"
 , "description": "Compile and serve assets from public directory."
 , "keywords": ["symfio-plugin", "symfio-contrib", "assets"]
 , "homepage": "http://symf.io/plugins/contrib-assets"
