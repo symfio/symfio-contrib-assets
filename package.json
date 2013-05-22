@@ -23,7 +23,7 @@
 , "dependencies": {
     "connect-coffee-script": "~0.1"
   , "stylus-responsive": "~0.0"
-  , "jade-static": "git://github.com/vslinko/jade-static.git#patch-1"
+  , "jade-static": "~1.1"
   , "stylus": "~0.32"
   , "nib": "~0.9"
   }
