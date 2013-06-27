@@ -12,17 +12,20 @@ symfio = require "symfio"
 
 container = symfio "example", __dirname
 
-loader = container.get "loader"
+container.use require "symfio-contrib-express"
+container.use require "symfio-contrib-assets"
 
-loader.use require "symfio-contrib-express"
-loader.use require "symfio-contrib-assets"
-
-loader.load()
+container.load()
 ```
 
 ## Required plugins
 
 * [contrib-express](https://github.com/symfio/symfio-contrib-express)
+
+## Provides
+
+* __serve__ — Assets serving helper. First argument is path to directory with
+  assets.
 
 ## Can be configured
 

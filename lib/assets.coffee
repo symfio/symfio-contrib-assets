@@ -16,28 +16,19 @@ compilerFactory = (str, path) ->
   compiler.use responsive
 
 
-module.exports = (container, callback) ->
-  applicationDirectory = container.get "application directory"
-  publicDirectory = path.join applicationDirectory, "public"
+module.exports = (container, applicationDirectory, publicDirectory) ->
+  unless publicDirectory
+    container.set "publicDirectory", path.join applicationDirectory, "public"
 
-  publicDirectory = container.get "public directory", publicDirectory
-  express = container.get "express"
-  logger = container.get "logger"
-  app = container.get "app"
+  container.set "serve", (app, express) ->
+    (directory) ->
+      app.use stylus.middleware
+        src: directory
+        compile: compilerFactory
 
-  logger.info "loading plugin", "contrib-assets"
+      app.use jade directory
+      app.use coffeescript directory
+      app.use express.static directory
 
-  serve = (directory) ->
-    app.use stylus.middleware (
-      src: directory
-      compile: compilerFactory
-    )
-
-    app.use jade directory
-    app.use coffeescript directory
-    app.use express.static directory
-
-  container.set "assets serve helper", serve
-  serve publicDirectory
-
-  callback()
+  container.call (serve, publicDirectory) ->
+    serve publicDirectory
