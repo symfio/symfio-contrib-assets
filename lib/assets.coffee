@@ -40,5 +40,5 @@ module.exports = (container) ->
       app.use express.static directory
 
 
-  container.call (serve, publicDirectory) ->
+  container.inject (serve, publicDirectory) ->
     serve publicDirectory

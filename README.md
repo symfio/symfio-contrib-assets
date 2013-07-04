@@ -12,21 +12,22 @@ symfio = require "symfio"
 
 container = symfio "example", __dirname
 
-container.use require "symfio-contrib-express"
-container.use require "symfio-contrib-assets"
-
-container.load()
+container.inject require "symfio-contrib-express"
+container.inject require "symfio-contrib-assets"
 ```
 
-## Required plugins
+## Dependencies
 
 * [contrib-express](https://github.com/symfio/symfio-contrib-express)
 
-## Provides
+## Configuration
 
-* __serve__ — Assets serving helper. First argument is path to directory with
-  assets.
+### `publicDirectory`
 
-## Can be configured
+Directory with assets. Default value is `public`.
 
-* __public directory__ — Directory with assets. Default value is `public`.
+## Services
+
+### `serve`
+
+Assets serving helper. First argument is path to directory with assets.
