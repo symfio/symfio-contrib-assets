@@ -11,6 +11,7 @@ describe "contrib-assets example", ->
 
   before (callback) ->
     container.set "autoload", false
+    container.set "env", "test"
     container.load().should.notify callback
 
   check = (url, text) ->

@@ -30,6 +30,7 @@
 , "devDependencies": {
     "symfio": "~2.0"
   , "symfio-contrib-express": "~2.0"
+  , "symfio-contrib-winston": "~2.0"
   , "chai": "~1.6"
   , "chai-as-promised": "~3.3"
   , "chai-http": "~0.3"

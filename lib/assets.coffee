@@ -16,19 +16,28 @@ compilerFactory = (str, path) ->
   compiler.use responsive
 
 
-module.exports = (container, applicationDirectory, publicDirectory) ->
-  unless publicDirectory
-    container.set "publicDirectory", path.join applicationDirectory, "public"
+module.exports = (container, applicationDirectory) ->
+  container.unless "publicDirectory", path.join applicationDirectory, "public"
 
-  container.set "serve", (app, express) ->
+  container.set "serve", (logger, app, express) ->
     (directory) ->
-      app.use stylus.middleware
+      logger.debug "serve assets", directory: directory
+
+      logger.debug "use express middleware", name: "stylus"
+      app.use stylus.middleware(
         src: directory
         compile: compilerFactory
+      )
 
+      logger.debug "use express middleware", name: "jade"
       app.use jade directory
+
+      logger.debug "use express middleware", name: "coffeescript"
       app.use coffeescript directory
+
+      logger.debug "use express middleware", name: "static"
       app.use express.static directory
+
 
   container.call (serve, publicDirectory) ->
     serve publicDirectory
