@@ -16,8 +16,9 @@ compilerFactory = (str, path) ->
   compiler.use responsive
 
 
-module.exports = (container, applicationDirectory) ->
-  container.unless "publicDirectory", path.join applicationDirectory, "public"
+module.exports = (container) ->
+  container.unless "publicDirectory", (applicationDirectory) ->
+    path.join applicationDirectory, "public"
 
   container.set "serve", (logger, app, express) ->
     (directory) ->
