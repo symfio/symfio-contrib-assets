@@ -19,36 +19,41 @@ compilerFactory = (str, path) ->
 
 
 module.exports = (container) ->
-  container.unless "publicDirectory", (applicationDirectory) ->
-    path.join applicationDirectory, "public"
+  container.unless "publicDirectory", (logger, applicationDirectory) ->
+    checkDirectory = (stats) ->
+      unless stats.isDirectory()
+        logger.warn "`publicDirectory' isn't directory", path: publicDirectory
+        return w.reject()
+
+    createDirectory = (err) ->
+      logger.debug "create public directory", path: publicDirectory
+      nodefn.call fs.mkdir, publicDirectory if err.errno is 34
+
+    publicDirectory = path.join applicationDirectory, "public"
+
+    nodefn.call(fs.stat, publicDirectory)
+    .then(checkDirectory, createDirectory)
+    .then ->
+      publicDirectory
 
   container.set "serve", (logger, app, express) ->
     (directory) ->
-      nodefn.call(fs.stat, directory)
-      .then (stats) ->
-        unless stats.isDirectory()
-          logger.warn "serve directory isn't directory", path: directory
-          return w.reject()
-      , (err) ->
-        nodefn.call fs.mkdir, directory if err.errno is 34
+      logger.debug "serve assets", directory: directory
 
-      .then ->
-        logger.debug "serve assets", directory: directory
+      logger.debug "use express middleware", name: "stylus"
+      app.use stylus.middleware(
+        src: directory
+        compile: compilerFactory
+      )
 
-        logger.debug "use express middleware", name: "stylus"
-        app.use stylus.middleware(
-          src: directory
-          compile: compilerFactory
-        )
+      logger.debug "use express middleware", name: "jade"
+      app.use jade directory
 
-        logger.debug "use express middleware", name: "jade"
-        app.use jade directory
+      logger.debug "use express middleware", name: "coffeescript"
+      app.use coffeescript directory
 
-        logger.debug "use express middleware", name: "coffeescript"
-        app.use coffeescript directory
-
-        logger.debug "use express middleware", name: "static"
-        app.use express.static directory
+      logger.debug "use express middleware", name: "static"
+      app.use express.static directory
 
 
   container.inject (serve, publicDirectory) ->
