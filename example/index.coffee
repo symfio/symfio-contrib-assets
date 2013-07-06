@@ -11,5 +11,7 @@ module.exports.promise = container.injectAll [
 
 
 if require.main is module
-  container.get("listener").then (listener) ->
+  module.exports.promise.then ->
+    container.get "listener"
+  .then (listener) ->
     listener.listen()
