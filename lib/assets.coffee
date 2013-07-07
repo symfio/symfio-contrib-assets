@@ -6,6 +6,7 @@ jade = require "jade-static"
 path = require "path"
 nib = require "nib"
 fs = require "fs"
+w = require "when"
 
 
 compilerFactory = (str, path) ->
@@ -19,22 +20,8 @@ compilerFactory = (str, path) ->
 
 
 module.exports = (container) ->
-  container.unless "publicDirectory", (logger, applicationDirectory) ->
-    checkDirectory = (stats) ->
-      unless stats.isDirectory()
-        logger.warn "`publicDirectory' isn't directory", path: publicDirectory
-        return w.reject()
-
-    createDirectory = (err) ->
-      logger.debug "create public directory", path: publicDirectory
-      nodefn.call fs.mkdir, publicDirectory if err.errno is 34
-
-    publicDirectory = path.join applicationDirectory, "public"
-
-    nodefn.call(fs.stat, publicDirectory)
-    .then(checkDirectory, createDirectory)
-    .then ->
-      publicDirectory
+  container.unless "publicDirectory", (applicationDirectory) ->
+    path.join applicationDirectory, "public"
 
   container.set "serve", (logger, app, express) ->
     (directory) ->
@@ -56,5 +43,17 @@ module.exports = (container) ->
       app.use express.static directory
 
 
-  container.inject (serve, publicDirectory) ->
-    serve publicDirectory
+  container.inject (serve, publicDirectory, logger) ->
+    checkDirectory = (stats) ->
+      unless stats.isDirectory()
+        logger.warn "`publicDirectory' isn't directory", path: publicDirectory
+        return w.reject()
+
+    createDirectory = (err) ->
+      logger.debug "create public directory", path: publicDirectory
+      nodefn.call fs.mkdir, publicDirectory if err.errno is 34
+
+    nodefn.call(fs.stat, publicDirectory)
+    .then(checkDirectory, createDirectory)
+    .then ->
+      serve publicDirectory
