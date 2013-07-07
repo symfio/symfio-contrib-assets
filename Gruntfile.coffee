@@ -2,6 +2,7 @@ module.exports = (grunt) ->
   grunt.initConfig
     simplemocha:
       example: "test/example.coffee"
+      plugin: "test/plugin.coffee"
       options: reporter: process.env.REPORTER or "spec"
     coffeelint:
       examples: "example/**/*.coffee"
