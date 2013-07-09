@@ -21,9 +21,8 @@ module.exports = (container) ->
     .then onFulfilled, onRejected
 
 
-  matchCacheFile = (url, cacheDirectory, ext) ->
-    hash = crypto.createHash("sha1").update(url).digest("hex")
-    path.join cacheDirectory, "#{hash}.#{ext}"
+  computeCacheId = (url) ->
+    crypto.createHash("sha1").update(url).digest("hex")
 
 
   compareStat = (file, cacheFile) ->
@@ -49,7 +48,11 @@ module.exports = (container) ->
   recompile = (file, cacheFile, compiler) ->
     recompileNeeded(file, cacheFile)
     .then (needed) ->
-      compile file, cacheFile, compiler if needed
+      if needed
+        compile(file, cacheFile, compiler).then ->
+          true
+      else
+        false
 
 
   container.unless "publicDirectory", (applicationDirectory) ->
@@ -104,11 +107,14 @@ module.exports = (container) ->
           url = req.url
 
         file = path.join s.directory, url.replace s.extRegex, s.sourceExt
-        cacheFile = matchCacheFile url, cacheDirectory, s.destinationExt
+        cacheId = computeCacheId url
+        cacheFile = path.join cacheDirectory, "#{cacheId}.#{s.destinationExt}"
 
-        onFulfilled = (data) ->
-          hash = path.basename cacheFile, path.extname cacheFile
-          res.set "X-Assets-Hash", hash
+        onFulfilled = (recompiled) ->
+          res.set "X-Assets-Cache", if recompiled
+            "id=#{cacheId}; recompiled"
+          else
+            "id=#{cacheId}"
           send(req, cacheFile).pipe res
 
         onRejected = (err) ->
@@ -186,9 +192,10 @@ module.exports = (container) ->
         .then (files) ->
           w.map files, (file) ->
             url = file.replace(server.directory, "")
-            cacheFile = matchCacheFile url, cacheDirectory,
-              server.destinationExt
-            logger.debug "precompile", file: file, cacheFile: cacheFile, url: url
+            cacheId = computeCacheId url
+            cacheFile = path.join cacheDirectory,
+              "#{cacheId}.#{s.destinationExt}"
+            logger.debug "precompile", file: file, cacheId: cacheId, url: url
             recompile file, cacheFile, server.compiler
 
   container.inject (serve, publicDirectory) ->
