@@ -2,6 +2,7 @@ callbacks = require "when/callbacks"
 nodefn = require "when/node/function"
 crypto = require "crypto"
 send = require "send"
+glob = require "glob"
 path = require "path"
 fs = require "fs"
 w = require "when"
@@ -18,6 +19,11 @@ module.exports = (container) ->
 
     nodefn.call(fs.stat, dir)
     .then onFulfilled, onRejected
+
+
+  matchCacheFile = (url, cacheDirectory, ext) ->
+    hash = crypto.createHash("sha1").update(url).digest("hex")
+    path.join cacheDirectory, "#{hash}.#{ext}"
 
 
   compareStat = (file, cacheFile) ->
@@ -81,6 +87,7 @@ module.exports = (container) ->
         directoryIndex: directoryIndex
         compiler: compiler
         matchRegex: matchRegex
+        globPattern: "#{dir}/**/*.#{sourceExt}"
         extRegex: new RegExp "#{destinationExt}$"
 
       @servers.push server
@@ -97,10 +104,11 @@ module.exports = (container) ->
           url = req.url
 
         file = path.join s.directory, url.replace s.extRegex, s.sourceExt
-        hash = crypto.createHash("sha1").update(url).digest("hex")
-        cacheFile = path.join cacheDirectory, "#{hash}.#{s.destinationExt}"
+        cacheFile = matchCacheFile url, cacheDirectory, s.destinationExt
 
         onFulfilled = (data) ->
+          hash = path.basename cacheFile, path.extname cacheFile
+          res.set "X-Assets-Hash", hash
           send(req, cacheFile).pipe res
 
         onRejected = (err) ->
@@ -171,6 +179,17 @@ module.exports = (container) ->
       serveCoffee directory
       serveStylus directory
 
+  container.set "precompileAssets", (assetsServers, cacheDirectory, logger) ->
+    ->
+      w.map assetsServers.servers, (server) ->
+        nodefn.call(glob, server.globPattern)
+        .then (files) ->
+          w.map files, (file) ->
+            url = file.replace(server.directory, "")
+            cacheFile = matchCacheFile url, cacheDirectory,
+              server.destinationExt
+            logger.debug "precompile", file: file, cacheFile: cacheFile, url: url
+            recompile file, cacheFile, server.compiler
 
-  container.inject (serve, publicDirectory, logger) ->
+  container.inject (serve, publicDirectory) ->
     serve publicDirectory

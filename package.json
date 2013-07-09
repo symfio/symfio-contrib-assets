@@ -23,6 +23,7 @@
 , "dependencies": {
     "when": "~2.2"
   , "send": "~0.1"
+  , "glob": "~3.2"
   , "jade": "~0.32"
   , "coffee-script": "~1.6"
   , "stylus": "~0.33"
