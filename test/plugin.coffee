@@ -37,8 +37,23 @@ describe "contrib-assets()", ->
 
   describe "container.unless publicDirectory", ->
     it "should define", (containerStub) ->
+      fs.stat.yields null, isDirectory: -> true
       factory = containerStub.unless.get "publicDirectory"
-      factory("/").should.equal "/public"
+      factory("/").should.eventually.equal "/public"
+
+    it "should reject if publicDirectory isn't directory",
+      (containerStub, serve) ->
+        fs.stat.yields null, isDirectory: -> false
+        factory = containerStub.unless.get "publicDirectory"
+        factory("/").should.be.rejected
+
+    it "should create directory", (containerStub, serve) ->
+      fs.stat.yields errno: 34
+      fs.mkdir.yields()
+      factory = containerStub.unless.get "publicDirectory"
+      factory("/").then ->
+        fs.mkdir.should.be.calledOnce
+        fs.mkdir.should.be.calledWith "/public"
 
   describe "container.set serve", ->
     it "should register four middlewares",
@@ -55,23 +70,8 @@ describe "contrib-assets()", ->
         serveStylus.should.be.calledOnce
         serveStylus.should.be.calledWith "/"
 
-  it "should reject if publicDirectory isn't directory",
-    (containerStub, serve, logger) ->
-      fs.stat.yields null, isDirectory: -> false
-      factory = containerStub.inject.get 0
-      factory(serve, "/", logger).should.be.rejected
-
-  it "should create directory", (containerStub, serve, logger) ->
-    fs.stat.yields errno: 34
-    fs.mkdir.yields()
+  it "should serve publicDirectory", (containerStub, serve) ->
     factory = containerStub.inject.get 0
-    factory(serve, "/", logger).then ->
-      fs.mkdir.should.be.calledOnce
-      fs.mkdir.should.be.calledWith "/"
-
-  it "should serve publicDirectory", (containerStub, serve, logger) ->
-    fs.stat.yields null, isDirectory: -> true
-    factory = containerStub.inject.get 0
-    factory(serve, "/", logger).then ->
-      serve.should.be.calledOnce
-      serve.should.be.calledWith "/"
+    factory serve, "/"
+    serve.should.be.calledOnce
+    serve.should.be.calledWith "/"

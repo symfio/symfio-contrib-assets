@@ -1,15 +1,62 @@
 callbacks = require "when/callbacks"
 nodefn = require "when/node/function"
+crypto = require "crypto"
+send = require "send"
 path = require "path"
 fs = require "fs"
 w = require "when"
 
 
 module.exports = (container) ->
-  container.unless "publicDirectory", (applicationDirectory) ->
-    path.join applicationDirectory, "public"
+  createDirectory = (dir) ->
+    onFulfilled = (stats) ->
+      throw new Error "`#{dir}' isn't directory" unless stats.isDirectory()
 
-  container.set "registerCompiler", (app) ->
+    onRejected = (err) ->
+      throw err unless err.errno is 34
+      nodefn.call fs.mkdir, dir
+
+    nodefn.call(fs.stat, dir)
+    .then onFulfilled, onRejected
+
+
+  compareStat = (file, cacheFile) ->
+    stat = nodefn.lift fs.stat
+    w.join(stat(file), stat(cacheFile))
+    .spread (fileStats, cacheFileStats) ->
+      fileStats.mtime > cacheFileStats.mtime
+
+
+  recompileNeeded = (file, cacheFile) ->
+    callbacks.call(fs.exists, cacheFile)
+    .then (exists) ->
+      return true unless exists
+      compareStat file, cacheFile
+
+
+  compile = (file, cacheFile, compiler) ->
+    compiler(file)
+    .then (data) ->
+      nodefn.call fs.writeFile, cacheFile, data
+
+
+  recompile = (file, cacheFile, compiler) ->
+    recompileNeeded(file, cacheFile)
+    .then (needed) ->
+      compile file, cacheFile, compiler if needed
+
+
+  container.unless "publicDirectory", (applicationDirectory) ->
+    publicDirectory = path.join applicationDirectory, "public"
+    createDirectory(publicDirectory).then ->
+      publicDirectory
+
+  container.unless "cacheDirectory", (applicationDirectory) ->
+    cacheDirectory = path.join applicationDirectory, "cache"
+    createDirectory(cacheDirectory).then ->
+      cacheDirectory
+
+  container.set "registerCompiler", (app, cacheDirectory) ->
     (directory, sourceExt, destinationExt, directoryIndex, compiler) ->
       if directoryIndex
         matchRegex = new RegExp "(\\/|\\.#{destinationExt})$"
@@ -28,19 +75,16 @@ module.exports = (container) ->
           url = req.url
 
         file = path.join directory, url.replace extRegex, sourceExt
+        hash = crypto.createHash("sha1").update(url).digest("hex")
+        cacheFile = path.join cacheDirectory, "#{hash}.#{destinationExt}"
 
-        respondData = (data) ->
-          res.send data
+        onFulfilled = (data) ->
+          send(req, cacheFile).pipe res
 
-        respondError = (err) ->
-          console.log err
+        onRejected = (err) ->
           res.send 500
 
-        callbacks.call(fs.exists, file)
-        .then (exists) ->
-          return next() unless exists
-          compiler file
-        .then respondData, respondError
+        recompile(file, cacheFile, compiler).then onFulfilled, onRejected
 
   container.set "serveStatic", (app, express, logger) ->
     (directory) ->
@@ -106,16 +150,4 @@ module.exports = (container) ->
 
 
   container.inject (serve, publicDirectory, logger) ->
-    checkDirectory = (stats) ->
-      unless stats.isDirectory()
-        logger.warn "`publicDirectory' isn't directory", path: publicDirectory
-        return w.reject()
-
-    createDirectory = (err) ->
-      logger.debug "create public directory", path: publicDirectory
-      nodefn.call fs.mkdir, publicDirectory if err.errno is 34
-
-    nodefn.call(fs.stat, publicDirectory)
-    .then(checkDirectory, createDirectory)
-    .then ->
-      serve publicDirectory
+    serve publicDirectory
