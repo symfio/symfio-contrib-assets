@@ -56,27 +56,49 @@ module.exports = (container) ->
     createDirectory(cacheDirectory).then ->
       cacheDirectory
 
-  container.set "registerCompiler", (app, cacheDirectory) ->
-    (directory, sourceExt, destinationExt, directoryIndex, compiler) ->
-      if directoryIndex
-        matchRegex = new RegExp "(\\/|\\.#{destinationExt})$"
+  container.set "assetsServers", (app, assetsMiddleware) ->
+    servers: []
+
+    match: (req) ->
+      return unless req.method in ["GET", "HEAD"]
+
+      for server in @servers
+        if server.matchRegex.test req.url
+          return server
+
+    register: (dir, sourceExt, destinationExt, directoryIndex, compiler) ->
+      app.use assetsMiddleware @ if @servers.length == 0
+
+      matchRegex = if directoryIndex
+        new RegExp "(\\/|\\.#{destinationExt})$"
       else
-        matchRegex = new RegExp "\\.#{destinationExt}$"
+        new RegExp "\\.#{destinationExt}$"
 
-      extRegex = new RegExp "#{destinationExt}$"
+      server =
+        directory: dir
+        sourceExt: sourceExt
+        destinationExt: destinationExt
+        directoryIndex: directoryIndex
+        compiler: compiler
+        matchRegex: matchRegex
+        extRegex: new RegExp "#{destinationExt}$"
 
-      app.use (req, res, next) ->
-        return next() unless req.method is "GET"
-        return next() unless matchRegex.test req.url
+      @servers.push server
 
-        if directoryIndex and req.url[-1..] is "/"
-          url = "#{req.url}index.#{destinationExt}"
+  container.set "assetsMiddleware", (cacheDirectory) ->
+    (assetsServers) ->
+      (req, res, next) ->
+        s = assetsServers.match req
+        return next() unless s
+
+        if s.directoryIndex and req.url[-1..] is "/"
+          url = "#{req.url}index.#{s.destinationExt}"
         else
           url = req.url
 
-        file = path.join directory, url.replace extRegex, sourceExt
+        file = path.join s.directory, url.replace s.extRegex, s.sourceExt
         hash = crypto.createHash("sha1").update(url).digest("hex")
-        cacheFile = path.join cacheDirectory, "#{hash}.#{destinationExt}"
+        cacheFile = path.join cacheDirectory, "#{hash}.#{s.destinationExt}"
 
         onFulfilled = (data) ->
           send(req, cacheFile).pipe res
@@ -84,7 +106,8 @@ module.exports = (container) ->
         onRejected = (err) ->
           res.send 500
 
-        recompile(file, cacheFile, compiler).then onFulfilled, onRejected
+        recompile(file, cacheFile, s.compiler)
+        .then onFulfilled, onRejected
 
   container.set "serveStatic", (app, express, logger) ->
     (directory) ->
@@ -100,10 +123,10 @@ module.exports = (container) ->
         fn = jade.compile data.toString(), filename: file
         fn locals
 
-  container.set "serveJade", (registerCompiler, compileJade, logger) ->
+  container.set "serveJade", (assetsServers, compileJade, logger) ->
     (directory) ->
       logger.debug "serve", type: "jade", path: directory
-      registerCompiler directory, "jade", "html", true, compileJade
+      assetsServers.register directory, "jade", "html", true, compileJade
 
   container.set "coffee", ->
     require "coffee-script"
@@ -113,10 +136,10 @@ module.exports = (container) ->
       nodefn.call(fs.readFile, file).then (data) ->
         coffee.compile data.toString()
 
-  container.set "serveCoffee", (registerCompiler, compileCoffee, logger) ->
+  container.set "serveCoffee", (assetsServers, compileCoffee, logger) ->
     (directory) ->
       logger.debug "serve", type: "coffee", path: directory
-      registerCompiler directory, "coffee", "js", false, compileCoffee
+      assetsServers.register directory, "coffee", "js", false, compileCoffee
 
   container.set "stylus", ->
     require "stylus"
@@ -136,10 +159,10 @@ module.exports = (container) ->
         compiler.use stylusResponsive
         nodefn.call compiler.render.bind compiler
 
-  container.set "serveStylus", (registerCompiler, compileStylus, logger) ->
+  container.set "serveStylus", (assetsServers, compileStylus, logger) ->
     (directory) ->
       logger.debug "serve", type: "stylus", path: directory
-      registerCompiler directory, "styl", "css", false, compileStylus
+      assetsServers.register directory, "styl", "css", false, compileStylus
 
   container.set "serve", (serveStatic, serveJade, serveCoffee, serveStylus) ->
     (directory) ->
