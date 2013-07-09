@@ -16,6 +16,18 @@ describe "contrib-assets()", ->
       express.static = sandbox.spy()
       express
 
+    container.set "serveStatic", (sandbox) ->
+      sandbox.spy()
+
+    container.set "serveJade", (sandbox) ->
+      sandbox.spy()
+
+    container.set "serveCoffee", (sandbox) ->
+      sandbox.spy()
+
+    container.set "serveStylus", (sandbox) ->
+      sandbox.spy()
+
     container.set "serve", (sandbox) ->
       sandbox.spy()
 
@@ -30,12 +42,18 @@ describe "contrib-assets()", ->
 
   describe "container.set serve", ->
     it "should register four middlewares",
-      (containerStub, logger, app, express) ->
+      (containerStub, serveStatic, serveJade, serveCoffee, serveStylus) ->
         factory = containerStub.set.get "serve"
-        serve = factory logger, app, express
+        serve = factory serveStatic, serveJade, serveCoffee, serveStylus
         serve "/"
-        app.use.callCount.should.equal 4
-        express.static.should.calledWith "/"
+        serveStatic.should.be.calledOnce
+        serveStatic.should.be.calledWith "/"
+        serveJade.should.be.calledOnce
+        serveJade.should.be.calledWith "/"
+        serveCoffee.should.be.calledOnce
+        serveCoffee.should.be.calledWith "/"
+        serveStylus.should.be.calledOnce
+        serveStylus.should.be.calledWith "/"
 
   it "should reject if publicDirectory isn't directory",
     (containerStub, serve, logger) ->
