@@ -1,77 +1,58 @@
 suite = require "symfio-suite"
-fs = require "fs"
 
 
 describe "contrib-assets()", ->
-  it = suite.plugin (container, containerStub) ->
-    require("..") containerStub
-    
-    container.set "app", (sandbox) ->
-      app = sandbox.spy()
-      app.use = sandbox.spy()
-      app
+  it = suite.plugin (container, stub) ->
+    container.inject ["suite/container"], require ".."
+    container.require require
+    container.require "when/node/function"
+    container.require "path"
+    container.set "applicationDirectory", "/"
+    container.set "publicDirectory", "/"
+    container.set "fs", (sandbox) ->
+      stat: sandbox.stub()
+      mkdir: sandbox.stub()
 
-    container.set "express", (sandbox) ->
-      express = sandbox.spy()
-      express.static = sandbox.spy()
-      express
+    stub.setFunction "serveStatic"
+    stub.setFunction "serveJade"
+    stub.setFunction "serveCoffee"
+    stub.setFunction "serveStylus"
+    stub.setFunction "serve"
+    stub.setPromisedFunction "assets/createDirectory"
 
-    container.set "serveStatic", (sandbox) ->
-      sandbox.spy()
+  describe "container.set assets/createDirectory", ->
+    it "should reject if publicDirectory isn't directory", (setted, fs) ->
+      fs.stat.yields null, isDirectory: -> false
+      factory = setted "assets/createDirectory"
+      factory().then (createDirectory) ->
+        createDirectory("/").should.be.rejected
 
-    container.set "serveJade", (sandbox) ->
-      sandbox.spy()
-
-    container.set "serveCoffee", (sandbox) ->
-      sandbox.spy()
-
-    container.set "serveStylus", (sandbox) ->
-      sandbox.spy()
-
-    container.set "serve", (sandbox) ->
-      sandbox.spy()
-
-    container.inject (sandbox) ->
-      sandbox.stub fs, "stat"
-      sandbox.stub fs, "mkdir"
-
-  describe "container.unless publicDirectory", ->
-    it "should define", (containerStub) ->
-      fs.stat.yields null, isDirectory: -> true
-      factory = containerStub.unless.get "publicDirectory"
-      factory("/").should.eventually.equal "/public"
-
-    it "should reject if publicDirectory isn't directory",
-      (containerStub, serve) ->
-        fs.stat.yields null, isDirectory: -> false
-        factory = containerStub.unless.get "publicDirectory"
-        factory("/").should.be.rejected
-
-    it "should create directory", (containerStub, serve) ->
+    it "should create directory", (setted, fs) ->
       fs.stat.yields errno: 34
       fs.mkdir.yields()
-      factory = containerStub.unless.get "publicDirectory"
-      factory("/").then ->
+      factory = setted "assets/createDirectory"
+      factory().then (createDirectory) ->
+        createDirectory "/"
+      .then ->
         fs.mkdir.should.be.calledOnce
-        fs.mkdir.should.be.calledWith "/public"
+        fs.mkdir.should.be.calledWith "/"
+
+  describe "container.unless publicDirectory", ->
+    it "should define", (unlessed) ->
+      factory = unlessed "publicDirectory"
+      factory().should.eventually.equal "/public"
 
   describe "container.set serve", ->
-    it "should register four middlewares",
-      (containerStub, serveStatic, serveJade, serveCoffee, serveStylus) ->
-        factory = containerStub.set.get "serve"
-        serve = factory serveStatic, serveJade, serveCoffee, serveStylus
+    it "should register four middlewares", (setted) ->
+      factory = setted "serve"
+      factory().then (serve) ->
         serve "/"
-        serveStatic.should.be.calledOnce
-        serveStatic.should.be.calledWith "/"
-        serveJade.should.be.calledOnce
-        serveJade.should.be.calledWith "/"
-        serveCoffee.should.be.calledOnce
-        serveCoffee.should.be.calledWith "/"
-        serveStylus.should.be.calledOnce
-        serveStylus.should.be.calledWith "/"
+        for dependency in factory.args
+          dependency.should.be.calledOnce
+          dependency.should.be.calledWith "/"
 
-  it "should serve publicDirectory", (containerStub, serve) ->
-    factory = containerStub.inject.get 0
-    factory serve, "/"
-    serve.should.be.calledOnce
-    serve.should.be.calledWith "/"
+  it "should serve publicDirectory", (injected) ->
+    factory = injected()
+    factory().then ->
+      factory.dependencies.serve.should.be.calledOnce
+      factory.dependencies.serve.should.be.calledWith "/"
