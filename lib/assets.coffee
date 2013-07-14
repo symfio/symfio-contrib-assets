@@ -3,6 +3,7 @@ module.exports = (container) ->
   container.require "when/node/function"
   container.require "stylusResponsive", "stylus-responsive"
   container.require "when/callbacks"
+  container.require "when/sequence"
   container.require "coffeeScript", "coffee-script"
   container.require "stylus"
   container.require "crypto"
@@ -92,35 +93,59 @@ module.exports = (container) ->
         cacheDirectory
 
 
-  container.set "assetsServers", (app, assetsMiddleware) ->
-    servers: []
+  container.set "assetsServers",
+    ["app", "assetsMiddleware", "w", "when/sequence", "fs", "path",
+    "when/node/function"],
+    (app, assetsMiddleware, w, sequence, fs, path, nodefn) ->
+      servers: []
 
-    match: (req) ->
-      return unless req.method in ["GET", "HEAD"]
+      match: (req) ->
+        return w.reject() unless req.method in ["GET", "HEAD"]
 
-      for server in @servers
-        if server.matchRegex.test req.url
-          return server
+        deffered = w.defer()
 
-    register: (dir, sourceExt, destinationExt, directoryIndex, compiler) ->
-      app.use assetsMiddleware @ if @servers.length == 0
+        sequence @servers.map (s) ->
+          ->
+            if s.matchRegex.test req.url
+              if s.directoryIndex and req.url[-1..] is "/"
+                url = "#{req.url}index.#{s.destinationExt}"
+              else
+                url = req.url
 
-      matchRegex = if directoryIndex
-        new RegExp "(\\/|\\.#{destinationExt})$"
-      else
-        new RegExp "\\.#{destinationExt}$"
+              file = path.join s.directory, url.replace s.extRegex, s.sourceExt
 
-      server =
-        directory: dir
-        sourceExt: sourceExt
-        destinationExt: destinationExt
-        directoryIndex: directoryIndex
-        compiler: compiler
-        matchRegex: matchRegex
-        globPattern: "#{dir}/**/*.#{sourceExt}"
-        extRegex: new RegExp "#{destinationExt}$"
+              onFulfilled = ->
+                deffered.resolve [s, url, file]
+                w.reject()
 
-      @servers.push server
+              onRejected = ->
+                w.resolve()
+
+              nodefn.call(fs.stat, file).then onFulfilled, onRejected
+        .then ->
+          deffered.reject()
+
+        deffered.promise
+
+      register: (dir, sourceExt, destinationExt, directoryIndex, compiler) ->
+        app.use assetsMiddleware @ if @servers.length == 0
+
+        matchRegex = if directoryIndex
+          new RegExp "(\\/|\\.#{destinationExt})$"
+        else
+          new RegExp "\\.#{destinationExt}$"
+
+        server =
+          directory: dir
+          sourceExt: sourceExt
+          destinationExt: destinationExt
+          directoryIndex: directoryIndex
+          compiler: compiler
+          matchRegex: matchRegex
+          globPattern: "#{dir}/**/*.#{sourceExt}"
+          extRegex: new RegExp "#{destinationExt}$"
+
+        @servers.push server
 
 
   container.set "assetsMiddleware",
@@ -129,30 +154,26 @@ module.exports = (container) ->
     (cacheDirectory, computeCacheId, recompile, path, send) ->
       (assetsServers) ->
         (req, res, next) ->
-          s = assetsServers.match req
-          return next() unless s
+          assetsServers.match(req).spread (s, url, file) ->
+            cacheId = computeCacheId url
+            cacheFile = path.join cacheDirectory,
+              "#{cacheId}.#{s.destinationExt}"
 
-          if s.directoryIndex and req.url[-1..] is "/"
-            url = "#{req.url}index.#{s.destinationExt}"
-          else
-            url = req.url
+            onFulfilled = (recompiled) ->
+              res.set "X-Assets-Cache", if recompiled
+                "id=#{cacheId}; recompiled"
+              else
+                "id=#{cacheId}"
+              send(req, cacheFile).pipe res
 
-          file = path.join s.directory, url.replace s.extRegex, s.sourceExt
-          cacheId = computeCacheId url
-          cacheFile = path.join cacheDirectory, "#{cacheId}.#{s.destinationExt}"
+            onRejected = (err) ->
+              console.log s, err
+              res.send 500
 
-          onFulfilled = (recompiled) ->
-            res.set "X-Assets-Cache", if recompiled
-              "id=#{cacheId}; recompiled"
-            else
-              "id=#{cacheId}"
-            send(req, cacheFile).pipe res
-
-          onRejected = (err) ->
-            res.send 500
-
-          recompile(file, cacheFile, s.compiler)
-          .then onFulfilled, onRejected
+            recompile(file, cacheFile, s.compiler)
+            .then onFulfilled, onRejected
+          .then null, ->
+            next()
 
 
   container.set "serveStatic", (app, express, logger) ->
