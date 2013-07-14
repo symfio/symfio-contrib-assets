@@ -31,3 +31,7 @@ Directory with assets. Default value is `public`.
 ### `serve`
 
 Assets serving helper. First argument is path to directory with assets.
+
+### `servePublicDirectory`
+
+Function used to serve public directory.

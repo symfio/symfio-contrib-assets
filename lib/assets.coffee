@@ -234,5 +234,6 @@ module.exports = (container) ->
               recompile file, cacheFile, server.compiler
 
 
-  container.inject (serve, publicDirectory) ->
-    serve publicDirectory
+  container.set "servePublicDirectory", (serve, publicDirectory) ->
+    ->
+      serve publicDirectory

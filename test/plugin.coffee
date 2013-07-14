@@ -51,8 +51,10 @@ describe "contrib-assets()", ->
           dependency.should.be.calledOnce
           dependency.should.be.calledWith "/"
 
-  it "should serve publicDirectory", (injected) ->
-    factory = injected()
-    factory().then ->
-      factory.dependencies.serve.should.be.calledOnce
-      factory.dependencies.serve.should.be.calledWith "/"
+  describe "container.set servePublicDirectory", ->
+    it "should serve publicDirectory", (setted) ->
+      factory = setted "servePublicDirectory"
+      factory().then (servePublicDirectory) ->
+        servePublicDirectory()
+        factory.dependencies.serve.should.be.calledOnce
+        factory.dependencies.serve.should.be.calledWith "/"
