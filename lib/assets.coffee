@@ -104,7 +104,7 @@ module.exports = (container) ->
 
         deffered = w.defer()
 
-        sequence @servers.map (s) ->
+        sequence(@servers.map (s) ->
           ->
             if s.matchRegex.test req.url
               if s.directoryIndex and req.url[-1..] is "/"
@@ -122,7 +122,7 @@ module.exports = (container) ->
                 w.resolve()
 
               nodefn.call(fs.stat, file).then onFulfilled, onRejected
-        .then ->
+        ).then ->
           deffered.reject()
 
         deffered.promise
